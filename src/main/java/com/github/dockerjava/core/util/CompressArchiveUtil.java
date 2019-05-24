@@ -18,6 +18,7 @@ import java.util.zip.GZIPOutputStream;
 
 import org.apache.commons.compress.archivers.tar.TarArchiveEntry;
 import org.apache.commons.compress.archivers.tar.TarArchiveOutputStream;
+import org.apache.commons.compress.archivers.tar.TarConstants;
 import org.apache.commons.compress.compressors.gzip.GzipCompressorOutputStream;
 import org.apache.commons.io.FileUtils;
 
@@ -95,17 +96,27 @@ public class CompressArchiveUtil {
                 new FileOutputStream(tarFile))))) {
             tos.setLongFileMode(TarArchiveOutputStream.LONGFILE_GNU);
             for (File file : files) {
-                TarArchiveEntry tarEntry = new TarArchiveEntry(file);
-                tarEntry.setName(relativize(base, file));
-
-                if (!file.isDirectory() && file.canExecute()) {
-                    tarEntry.setMode(tarEntry.getMode() | 0755);
-                }
-
-                tos.putArchiveEntry(tarEntry);
-
-                if (!file.isDirectory()) {
-                    FileUtils.copyFile(file, tos);
+            	// If file is a symbolic link
+                if (Files.isSymbolicLink(file.toPath())) {
+                	Path target = Files.readSymbolicLink(file.toPath());
+                    String targetEntryName = target.toFile().getName();
+                    TarArchiveEntry tarEntry = new TarArchiveEntry(relativize(base.toPath(), file.toPath()), TarConstants.LF_SYMLINK);
+                    tarEntry.setLinkName(targetEntryName);
+                    tos.putArchiveEntry(tarEntry);
+                    
+                } else {
+	                TarArchiveEntry tarEntry = new TarArchiveEntry(file);
+	                tarEntry.setName(relativize(base, file));
+	
+	                if (!file.isDirectory() && file.canExecute()) {
+	                    tarEntry.setMode(tarEntry.getMode() | 0755);
+	                }
+	
+	                tos.putArchiveEntry(tarEntry);
+	
+	                if (!file.isDirectory()) {
+	                    FileUtils.copyFile(file, tos);
+	                }
                 }
                 tos.closeArchiveEntry();
             }
